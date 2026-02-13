@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html>
+<head><title>IFC Load Test</title></head>
+<body>
+  <input type="file" id="fileInput" accept=".ifc" />
+  <div id="log" style="white-space:pre-wrap; font-family:monospace; padding:20px;"></div>
+  <script type="module">
+    const log = (msg) => {
+      document.getElementById('log').textContent += msg + '\n';
+      console.log(msg);
+    };
+
+    try {
+      log('1. Importing three...');
+      const THREE = await import('three');
+      log('   OK: three@' + THREE.REVISION);
+
+      log('2. Importing IFCLoader...');
+      const { IFCLoader } = await import('web-ifc-three/IFCLoader');
+      log('   OK: IFCLoader imported');
+
+      log('3. Creating IFCLoader instance...');
+      const loader = new IFCLoader();
+      log('   OK: loader created, ifcManager exists: ' + !!loader.ifcManager);
+
+      log('4. Setting WASM path...');
+      await loader.ifcManager.setWasmPath('/');
+      log('   OK: WASM path set');
+
+      log('5. Ready. Select an IFC file to test loading.');
+
+      document.getElementById('fileInput').addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        log(`\n--- Loading: ${file.name} (${file.size} bytes) ---`);
+
+        const url = URL.createObjectURL(file);
+        log('6. Object URL created: ' + url);
+
+        loader.load(
+          url,
+          (model) => {
+            URL.revokeObjectURL(url);
+            log('7. SUCCESS! Model loaded.');
+            log('   modelID: ' + model.modelID);
+            log('   children: ' + model.children.length);
+            log('   geometry vertices: ' + (model.geometry?.attributes?.position?.count || 'N/A'));
+          },
+          (progress) => {
+            if (progress.total > 0) {
+              log('   Progress: ' + Math.round(progress.loaded / progress.total * 100) + '%');
+            }
+          },
+          (error) => {
+            URL.revokeObjectURL(url);
+            log('7. ERROR loading: ' + error);
+            log('   Error type: ' + (error?.constructor?.name || typeof error));
+            if (error?.message) log('   Message: ' + error.message);
+            if (error?.stack) log('   Stack: ' + error.stack);
+          }
+        );
+      });
+    } catch (err) {
+      log('FATAL: ' + err.message);
+      log('Stack: ' + err.stack);
+    }
+  </script>
+</body>
+</html>
